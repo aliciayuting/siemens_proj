@@ -35,6 +35,7 @@ def get_image(image_path):
      byteIO = io.BytesIO()
      i_image.save(byteIO, format='PNG')
      byteArr = byteIO.getvalue()
+     # byteArr = np.array(i_image).tobytes()
      return byteArr
 
 if __name__ == '__main__':
@@ -46,16 +47,12 @@ if __name__ == '__main__':
      res = capi.create_object_pool('/crack', "VolatileCascadeStoreWithStringKey",0)
      res = capi.create_object_pool('/crack_result', "PersistentCascadeStoreWithStringKey",0)
      
-     # 2 - construct the input to send as a request to Cascade server
-     # current_directory = os.getcwd()
-     # image_path = os.path.join(current_directory, "cat.jpeg") # https://cornell.box.com/shared/static/07pvizx9zpf2vd1upj0y9wce2p44sao4.jpeg
-     # input_value = get_image(image_path)
-     
-     # 3 - send the request to Cascade servers
+     # 2 - send the request to Cascade servers
      image_pathnames = get_image_pathnames(IMAGE_DIRECTORY)
      message_id = 0
      for message_id in range(TOTAL_NUM):
           input_img = image_pathnames[message_id % len(image_pathnames)]
           input_value = get_image(input_img)
-          capi.put(f"/crack/{message_id}",input_value,trigger=True,message_id=message_id)
+          print(len(input_value))
+          capi.put(f"/crack/{message_id}",input_value,trigger=False,message_id=message_id)
 
