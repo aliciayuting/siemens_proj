@@ -6,7 +6,7 @@ import numpy as np
 import os
 import sys,time,math,json
 from PIL import Image
-from python_udls.setting import *
+from python_udls.setup import *
 
 
 IMAGE_DIRECTORY = './siemensimgs'

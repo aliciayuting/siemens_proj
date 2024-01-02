@@ -14,7 +14,7 @@ from PIL import Image
 import torch
 from torchvision import transforms
 import math
-from setting import *
+from setup import *
 
 
 FILE = Path(__file__).resolve()
