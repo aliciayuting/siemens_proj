@@ -143,7 +143,7 @@ class HoleDetectUDL(UserDefinedLogic):
           Constructor
           '''
           super(HoleDetectUDL,self).__init__(conf_str)
-          device_name = 'cuda:1'
+          device_name = 'cuda:0'
           self.capi = ServiceClientAPI()
           self.device = torch.device(device_name)
           self.transform = transforms.Compose([transforms.ToTensor()])
