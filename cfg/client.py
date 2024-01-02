@@ -6,12 +6,14 @@ import numpy as np
 import os
 import sys,time,math,json
 from PIL import Image
-from python_udls.setup import *
+from python_udls.logging_flags import *
 
 
 IMAGE_DIRECTORY = './siemensimgs'
 
-
+TOTAL_NUM_OBJ = 1
+TOTAL_CAMERA = 8
+TOTAL_ROUND = 3
 
 def get_image_pathnames(directory, img_suffixes=['.jpg','.png', '.jpeg']):
      '''

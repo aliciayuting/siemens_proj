@@ -14,7 +14,7 @@ from PIL import Image
 import torch
 from torchvision import transforms
 import math
-from setup import *
+from logging_flags import *
 
 
 FILE = Path(__file__).resolve()
@@ -30,7 +30,6 @@ if str(ROOT / 'yolov5' / 'models') not in sys.path:
 if str(ROOT / 'yolov5' / 'utils') not in sys.path:
     sys.path.append(str(ROOT / 'yolov5' / 'utils'))  
 ROOT = Path(os.path.relpath(ROOT, Path.cwd()))  # relative
-
 
 from models.common import DetectMultiBackend
 from utils.general import (LOGGER, Profile, 
@@ -85,35 +84,24 @@ class CrackDetectUDL(UserDefinedLogic):
           res_key = key.split('-')[1]
           round_id = int(res_key.split('_')[0])
           camera_id = int(res_key.split('_')[1])
-          extra_log_id = round_id * TOTAL_CAMERA + camera_id
           blob = kwargs["blob"]
-          self.tl.log(BEGIN_CRACK_PRE_TIMESTAMP,self.my_id,obj_id,extra_log_id)
+          self.tl.log(BEGIN_CRACK_PRE_TIMESTAMP,self.my_id,obj_id,0)
           image = Image.open(io.BytesIO(blob))
           # image pre-proccessing 
           input_image = self.transform(image).unsqueeze(0)
           input_image = input_image.to(self.device)
           input_image /= 255
           # run inference
-          self.tl.log(BEGIN_CRACK_DETECT_TIMESTAMP,self.my_id,obj_id,extra_log_id)
+          self.tl.log(BEGIN_CRACK_DETECT_TIMESTAMP,self.my_id,obj_id,0)
           pred, train_out  = self.model(input_image, augment=False, visualize=False)
           # post-processing: TODO: draw bounding box?
           pred = non_max_suppression(pred, conf_thres=0.25, iou_thres=0.25, classes=False, agnostic=False, max_det=1000)
-          self.tl.log(FINISH_CRACK_DETECT_TIMESTAMP,self.my_id,obj_id,extra_log_id)
+          self.tl.log(FINISH_CRACK_DETECT_TIMESTAMP,self.my_id,obj_id,0)
           # print(f"CrackDetectUDL ocdpo_handler: message_id={key}, result={len(pred)}")
           # save result
           stacked_pred = np.stack([t.cpu().numpy() for t in pred])
           new_key = key + "_crack"
           cascade_context.emit(new_key, stacked_pred)
-          # new_key = "/crack_result/" + str(key)
-          # bytes_list = [t.cpu().numpy().tobytes().decode('utf-8') for t in pred]
-          # combined_bytes = ' '.join(bytes_list).encode('utf-8')  
-          # self.capi.put(new_key, combined_bytes)
-          if(obj_id == TOTAL_NUM_OBJ -1 and FLUSH_RESULT):
-               self.tl.flush("crack_timestamps.dat",False)
-               print("flushed crack_timestamp.dat")
-               # self.last_img_collected_num += 1
-               # if (self.last_img_collected_num == TOTAL_CAMERA * TOTAL_ROUND):
-               #      self.tl.flush("crack_timestamps.dat",False)
           
           
 
@@ -165,24 +153,20 @@ class HoleDetectUDL(UserDefinedLogic):
           res_key = key.split('-')[1]
           round_id = int(res_key.split('_')[0])
           camera_id = int(res_key.split('_')[1])
-          extra_log_id = round_id * TOTAL_CAMERA + camera_id
           blob = kwargs["blob"]
-          self.tl.log(BEGIN_HOLE_PRE_TIMESTAMP,self.my_id,obj_id,extra_log_id)
+          self.tl.log(BEGIN_HOLE_PRE_TIMESTAMP,self.my_id,obj_id,0)
           image = Image.open(io.BytesIO(blob))
           input_image = self.transform(image).unsqueeze(0)
           input_image = input_image.to(self.device)
           input_image /= 255
-          self.tl.log(BEGIN_HOLE_DETECT_TIMESTAMP,self.my_id,obj_id,extra_log_id)
+          self.tl.log(BEGIN_HOLE_DETECT_TIMESTAMP,self.my_id,obj_id,0)
           pred, train_out  = self.model(input_image, augment=False, visualize=False)
           pred = non_max_suppression(pred, conf_thres=0.25, iou_thres=0.25, classes=False, agnostic=False, max_det=1000)
-          # print(f"HoleDetectUDL ocdpo_handler: message_id={key}, result={pred}")
-          self.tl.log(FINISH_HOLE_DETECT_TIMESTAMP,self.my_id,obj_id,extra_log_id)
+          self.tl.log(FINISH_HOLE_DETECT_TIMESTAMP,self.my_id,obj_id,0)
           stacked_pred = np.stack([t.cpu().numpy() for t in pred])
           new_key = key + "_hole"
           cascade_context.emit(new_key, stacked_pred)
-          if(obj_id == TOTAL_NUM_OBJ-1 and FLUSH_RESULT):
-               self.tl.flush("hole_timestamps.dat",False)
-               print("flushed hole_timestamp.dat")
+          
 
      def __del__(self):
           '''
@@ -222,7 +206,6 @@ class AggregateUDL(UserDefinedLogic):
           The off-critical data path handler, gets executed when the UDL is triggered at server nodes
           '''
           key = kwargs["key"]
-          print(f"aggr key: {key}")
           blob = kwargs["blob"]
           obj_id = key.split('-')[0]
           res_key = key.split('-')[1]
@@ -238,6 +221,9 @@ class AggregateUDL(UserDefinedLogic):
           self.results[obj_id][task_name][img_info] = blob
           if self.check_collect_all(obj_id, task_name):
                print(f"------- COLLECTED_ALL: object_id:{obj_id} -----")
+               if(int(obj_id) % LOGGING_POINT == 0 and FLUSH_RESULT):
+                    self.tl.flush("hole_timestamps.dat",False)
+                    print("flushed hole_timestamp.dat")
           
 
      def __del__(self):
