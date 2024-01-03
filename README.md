@@ -5,7 +5,7 @@
 
 Under the directory of /siemens_proj/cfg, there are several configuration files of interest.
 
-- dfgs.json.tmp
+#### - dfgs.json.tmp
 
 Defines the dataflow graph of the application. In this assembly line application, each input is going to be
 processed by 3 UDLs: CrackDetectUDL, HoleDetectUDL, and AggregateUDL. The processing sequence and graph relation of their executions are defined in dfgs.json.tmp.
@@ -15,7 +15,7 @@ In the first vertex of the dataflow graph, it specifies the following: the input
 In the second vertex of the dataflow graph, it specifices the following: the object pool of "/partial_result" is attached with the UDL named AggregateUDL. This UDL serves the purpose of aggregating the crack detection and hole detection results for the images with the same object ID. The result of this aggregation is stored to the object pool named "/aggregate_result".
 
 
-- layout.json.tmp
+#### -layout.json.tmp
 
 Define the layout of the cascade's server nodes. In this layout, we use only two server nodes, where there is one shard per each subgroup, to run the service. We also created a example layout_2shards_example.json.tmp for your reference, if you want to experiment with more than 1 shard per subgroup.
 
@@ -24,11 +24,11 @@ Define the layout of the cascade's server nodes. In this layout, we use only two
 
 Under python_udls directory, there are two main componenets.
 
-- yolov5/
+#### -yolov5/
 
 This is derived from YOLO repo from ultralitics, https://github.com/ultralytics/yolov5 . In the UDLs, we use the basic yolov5 model without any customization directly from the original repo.
 
-- siemens_udls.py
+#### -siemens_udls.py
 
 This file defines all the UDLs we use in this example code. 
 
@@ -38,12 +38,12 @@ AggregateUDL is a UDL to aggregate the crack and hole detection result for each 
 
 ## Run the program
 
-- Start the server nodes
+#### -Start the server nodes
 
 Under the server nodes' folder (n0, n1 in this example), start the server nodes by the command ```cascade_server```. (To start the server nodes from fresh, run ``` ./clear_log.sh ``` before start the servers)
 One may note the initialization of the server node, and UDLs. For the two ML UDLs, they would load the models to GPU upon initialization.
 
-- Setup the Object Pool
+#### -Setup the Object Pool
 
 Under the client node's folder (n2 in this example), there are 2 steps to do.
 
