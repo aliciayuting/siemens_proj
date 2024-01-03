@@ -184,20 +184,21 @@ class AggregateUDL(UserDefinedLogic):
                return False
           return True
 
-     def process_aggr_results(self, obj_id):
+     def get_aggr_results(self, obj_id):
           '''
-          Example use case of aggregate results
+          Example use case of aggregate results 
           Return True, if object has defect (i.e., is identified with crack or hole by a camera in a round)
           Return False, if object has no defect (i.e., no crack or hole identified for this object by any camera in any round)
+          (Based on the requirements, the result could be more complicated and store more than just TRUE/FALSE for each object)
           '''
           for crack_result in self.results[obj_id]["crack"].values():
                if len(crack_result) > 0:
-                    print("crack_result has len > 0")
-                    print(crack_result)
+                    print(f"Object {obj_id} has crack")
                     return True 
           for hole_result in self.results[obj_id]["hole"].values():
                if len(hole_result) > 0:
-                    print("hole_result has len > 0")
+                    print(f"Object {obj_id} has hole")
+
                     print(hole_result)
                     return True  
           print(f"Object {obj_id} has no defect")
@@ -222,10 +223,13 @@ class AggregateUDL(UserDefinedLogic):
           img_info = (round_id,camera_id)
           self.results[obj_id][task_name][img_info] = blob
           if self.check_collect_all(obj_id):
-               has_defect = self.process_aggr_results(obj_id)
+               has_defect = self.get_aggr_results(obj_id)
                # Store a simple array [True/False] to represent if the product has defect. 
                # Could be encoded to a more informative object to store to this object key
                cascade_context.emit(obj_id, np.array(has_defect))
+               # Remove object from the UDL local cache after stored in cascade server
+               del self.results[obj_id]
+               print(len(self.results))
                print(f"------- COLLECTED_ALL: object_id:{obj_id} -----")
           
 

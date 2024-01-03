@@ -42,18 +42,11 @@ def get_image(image_path):
      return byteArr
 
 if __name__ == '__main__':
-     # 0 - create Cascade client
+     # create Cascade client
      capi = ServiceClientAPI()
      my_id = capi.get_my_id()
-     
-     # 1 - create object pool to accept and keep the result
-     capi.create_object_pool('/img_input', "VolatileCascadeStoreWithStringKey",0)
-     affinity_set_regex = "/[0-9]+-"
-     capi.create_object_pool('/partial_result', "VolatileCascadeStoreWithStringKey",0, affinity_set_regex=affinity_set_regex)
-     capi.create_object_pool('/aggregate_result', "VolatileCascadeStoreWithStringKey", 0)
-     # capi.create_object_pool('/aggregate_result', "PersistentCascadeStoreWithStringKey",0)
 
-     # 2 - send the request to Cascade servers
+     # send the request to Cascade servers
      image_pathnames = get_image_pathnames(IMAGE_DIRECTORY)
      images = []
      for i in range(TOTAL_NUM_OBJ*TOTAL_CAMERA*TOTAL_ROUND):
