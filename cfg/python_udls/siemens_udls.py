@@ -81,9 +81,6 @@ class CrackDetectUDL(UserDefinedLogic):
           '''
           key = kwargs["key"]
           obj_id = int(key.split('-')[0])
-          res_key = key.split('-')[1]
-          round_id = int(res_key.split('_')[0])
-          camera_id = int(res_key.split('_')[1])
           blob = kwargs["blob"]
           self.tl.log(BEGIN_CRACK_PRE_TIMESTAMP,self.my_id,obj_id,0)
           image = Image.open(io.BytesIO(blob))
@@ -150,9 +147,6 @@ class HoleDetectUDL(UserDefinedLogic):
           '''
           key = kwargs["key"]
           obj_id = int(key.split('-')[0])
-          res_key = key.split('-')[1]
-          round_id = int(res_key.split('_')[0])
-          camera_id = int(res_key.split('_')[1])
           blob = kwargs["blob"]
           self.tl.log(BEGIN_HOLE_PRE_TIMESTAMP,self.my_id,obj_id,0)
           image = Image.open(io.BytesIO(blob))
@@ -192,7 +186,7 @@ class AggregateUDL(UserDefinedLogic):
           self.tl = TimestampLogger()
           print(f"AggregateUDL Constructed, img_count_per_obj set to {self.img_count_per_obj}")
 
-     def check_collect_all(self, obj_id, task_name):
+     def check_collect_all(self, obj_id):
           if obj_id not in self.results:
                return False
           if "crack" not in self.results[obj_id] or len(self.results[obj_id]["crack"]) < self.img_count_per_obj:
@@ -201,26 +195,50 @@ class AggregateUDL(UserDefinedLogic):
                return False
           return True
 
+     def process_aggr_results(self, obj_id):
+          '''
+          Example use case of aggregate results
+          Return True, if object has defect (i.e., is identified with crack or hole by a camera in a round)
+          Return False, if object has no defect (i.e., no crack or hole identified for this object by any camera in any round)
+          '''
+          for crack_result in self.results[obj_id]["crack"].values():
+               if len(crack_result) > 0:
+                    print("crack_result has len > 0")
+                    print(crack_result)
+                    return True 
+          for hole_result in self.results[obj_id]["hole"].values():
+               if len(hole_result) > 0:
+                    print("hole_result has len > 0")
+                    print(hole_result)
+                    return True  
+          print(f"Object {obj_id} has no defect")
+          return False
+
+
      def ocdpo_handler(self,**kwargs):
           '''
           The off-critical data path handler, gets executed when the UDL is triggered at server nodes
           '''
-          key = kwargs["key"]
+          key = kwargs["key"] # in the format "[objID]-r[roundID]_c[cameraID]_[taskName]"(e.g. "0-r0_c0_crack")
           blob = kwargs["blob"]
           obj_id = key.split('-')[0]
           res_key = key.split('-')[1]
-          round_id = res_key.split('_')[0]
-          camera_id = res_key.split('_')[1]
+          round_id = (res_key.split('_')[0])[1:] 
+          camera_id = (res_key.split('_')[1])[1:]
           task_name = res_key.split('_')[2]
-          # print(f"obj_id:{obj_id}, round_id:{round_id}, camera_id:{camera_id}, task_name:{task_name}")
           if obj_id not in self.results:
                self.results[obj_id] = {}
           if task_name not in self.results[obj_id]:
                self.results[obj_id][task_name] = {}
-          img_info = round_id + "-" + camera_id
+          img_info = (round_id,camera_id)
           self.results[obj_id][task_name][img_info] = blob
-          if self.check_collect_all(obj_id, task_name):
+          if self.check_collect_all(obj_id):
                print(f"------- COLLECTED_ALL: object_id:{obj_id} -----")
+               has_defect = self.process_aggr_results(obj_id)
+               # Store a simple array [True/False] to represent if the product has defect. 
+               # Could be encoded to a more informative object to store to this object key
+               cascade_context.emit(obj_id, np.array(has_defect))
+               # Flush the logging file
                if(int(obj_id) % LOGGING_POINT == 0 and FLUSH_RESULT):
                     self.tl.flush("hole_timestamps.dat",False)
                     print("flushed hole_timestamp.dat")

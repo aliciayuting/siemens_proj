@@ -1,0 +1,4 @@
+# Base (Same requirements as yolov5) -------------------------------------------
+opencv-python>=4.1.1
+torchvision>=0.9.0
+pandas>=1.1.4

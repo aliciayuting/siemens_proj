@@ -80,7 +80,7 @@ if __name__ == '__main__':
 
                for camera_id in camera_ids:
                     input_value = images[image_id % len(image_pathnames)]
-                    key = str(obj_id) + "-" + str(round_id) + "_" + str(camera_id)
+                    key = str(obj_id) + "-r" + str(round_id) + "_c" + str(camera_id)
                     extra_log_id = round_id * TOTAL_CAMERA + camera_id
                     tl.log(EXTERNAL_CLIENT_SEND_TIME,capi.get_my_id(),obj_id,extra_log_id)
                     capi.put(f"/img_input/{key}",input_value,trigger=False,message_id=image_id)
