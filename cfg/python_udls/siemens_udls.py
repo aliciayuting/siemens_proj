@@ -14,7 +14,6 @@ from PIL import Image
 import torch
 from torchvision import transforms
 import math
-from logging_flags import *
 
 
 FILE = Path(__file__).resolve()
@@ -70,7 +69,6 @@ class CrackDetectUDL(UserDefinedLogic):
           self.my_id = self.capi.get_my_id()
           if (self.my_id != 0):
                self.load_model()
-          self.tl = TimestampLogger()
           self.last_img_collected_num = 0
           
 
@@ -82,18 +80,15 @@ class CrackDetectUDL(UserDefinedLogic):
           key = kwargs["key"]
           obj_id = int(key.split('-')[0])
           blob = kwargs["blob"]
-          self.tl.log(BEGIN_CRACK_PRE_TIMESTAMP,self.my_id,obj_id,0)
           image = Image.open(io.BytesIO(blob))
           # image pre-proccessing 
           input_image = self.transform(image).unsqueeze(0)
           input_image = input_image.to(self.device)
           input_image /= 255
           # run inference
-          self.tl.log(BEGIN_CRACK_DETECT_TIMESTAMP,self.my_id,obj_id,0)
           pred, train_out  = self.model(input_image, augment=False, visualize=False)
           # post-processing: TODO: draw bounding box?
           pred = non_max_suppression(pred, conf_thres=0.25, iou_thres=0.25, classes=False, agnostic=False, max_det=1000)
-          self.tl.log(FINISH_CRACK_DETECT_TIMESTAMP,self.my_id,obj_id,0)
           # print(f"CrackDetectUDL ocdpo_handler: message_id={key}, result={len(pred)}")
           # save result
           stacked_pred = np.stack([t.cpu().numpy() for t in pred])
@@ -139,7 +134,6 @@ class HoleDetectUDL(UserDefinedLogic):
           self.my_id = self.capi.get_my_id()
           if (self.my_id != 0):
                self.load_model()
-          self.tl = TimestampLogger()
 
      def ocdpo_handler(self,**kwargs):
           '''
@@ -148,15 +142,12 @@ class HoleDetectUDL(UserDefinedLogic):
           key = kwargs["key"]
           obj_id = int(key.split('-')[0])
           blob = kwargs["blob"]
-          self.tl.log(BEGIN_HOLE_PRE_TIMESTAMP,self.my_id,obj_id,0)
           image = Image.open(io.BytesIO(blob))
           input_image = self.transform(image).unsqueeze(0)
           input_image = input_image.to(self.device)
           input_image /= 255
-          self.tl.log(BEGIN_HOLE_DETECT_TIMESTAMP,self.my_id,obj_id,0)
           pred, train_out  = self.model(input_image, augment=False, visualize=False)
           pred = non_max_suppression(pred, conf_thres=0.25, iou_thres=0.25, classes=False, agnostic=False, max_det=1000)
-          self.tl.log(FINISH_HOLE_DETECT_TIMESTAMP,self.my_id,obj_id,0)
           stacked_pred = np.stack([t.cpu().numpy() for t in pred])
           new_key = key + "_hole"
           cascade_context.emit(new_key, stacked_pred)
@@ -167,7 +158,6 @@ class HoleDetectUDL(UserDefinedLogic):
           Destructor
           '''
           print(f"HoleDetectUDL destructor")
-          self.tl.flush("hole_timestamps.dat",False)
 
 
 class AggregateUDL(UserDefinedLogic):
@@ -183,7 +173,6 @@ class AggregateUDL(UserDefinedLogic):
           self.conf = json.loads(conf_str)
           self.img_count_per_obj = int(self.conf["img_count_per_obj"])
           self.results = {} # map: {obj_id->{"hole": {(round_id, camera_id):result, ...}, "crack": [img1_hole_result, img2_hole_result, ...]}, ... }
-          self.tl = TimestampLogger()
           print(f"AggregateUDL Constructed, img_count_per_obj set to {self.img_count_per_obj}")
 
      def check_collect_all(self, obj_id):
@@ -233,15 +222,11 @@ class AggregateUDL(UserDefinedLogic):
           img_info = (round_id,camera_id)
           self.results[obj_id][task_name][img_info] = blob
           if self.check_collect_all(obj_id):
-               print(f"------- COLLECTED_ALL: object_id:{obj_id} -----")
                has_defect = self.process_aggr_results(obj_id)
                # Store a simple array [True/False] to represent if the product has defect. 
                # Could be encoded to a more informative object to store to this object key
                cascade_context.emit(obj_id, np.array(has_defect))
-               # Flush the logging file
-               if(int(obj_id) % LOGGING_POINT == 0 and FLUSH_RESULT):
-                    self.tl.flush("hole_timestamps.dat",False)
-                    print("flushed hole_timestamp.dat")
+               print(f"------- COLLECTED_ALL: object_id:{obj_id} -----")
           
 
      def __del__(self):

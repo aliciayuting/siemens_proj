@@ -6,7 +6,6 @@ import numpy as np
 import os
 import sys,time,math,json
 from PIL import Image
-from python_udls.logging_flags import *
 
 
 IMAGE_DIRECTORY = './siemensimgs'
@@ -46,7 +45,6 @@ if __name__ == '__main__':
      # 0 - create Cascade client
      capi = ServiceClientAPI()
      my_id = capi.get_my_id()
-     tl = TimestampLogger()
      
      # 1 - create object pool to accept and keep the result
      capi.create_object_pool('/img_input', "VolatileCascadeStoreWithStringKey",0)
@@ -73,7 +71,6 @@ if __name__ == '__main__':
                # Logging
                for camera_id in camera_ids:
                     extra_log_id = round_id * TOTAL_CAMERA + camera_id
-                    tl.log(CAMERA_SEND_TIME,capi.get_my_id(),obj_id,extra_log_id)
                while(int(time.perf_counter() * 1000) - last_round_time < 200):
                     time.sleep(0.0001)
                last_round_time = time.perf_counter() * 1000
@@ -82,17 +79,12 @@ if __name__ == '__main__':
                     input_value = images[image_id % len(image_pathnames)]
                     key = str(obj_id) + "-r" + str(round_id) + "_c" + str(camera_id)
                     extra_log_id = round_id * TOTAL_CAMERA + camera_id
-                    tl.log(EXTERNAL_CLIENT_SEND_TIME,capi.get_my_id(),obj_id,extra_log_id)
                     capi.put(f"/img_input/{key}",input_value,trigger=False,message_id=image_id)
-                    tl.log(EXTERNAL_CLIENT_FINISH_SEND_TIME,capi.get_my_id(),obj_id,extra_log_id)
                     image_id += 1
-                    # asyc_noise = np.random.exponential(scale=0.001)
-                    # time.sleep(asyc_noise)
+                    asyc_noise = np.random.exponential(scale=0.001)
+                    time.sleep(asyc_noise)
           while(int(time.perf_counter() * 1000) - last_obj_time < 2600):
                time.sleep(0.0001)
-          last_obj_time = time.perf_counter() * 1000
-          # time.sleep(2.6)
-               
-     tl.flush(f'client_timestamps.dat',False) 
+          last_obj_time = time.perf_counter() * 1000               
 
 
