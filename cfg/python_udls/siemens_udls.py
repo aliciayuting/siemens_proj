@@ -65,8 +65,8 @@ class CrackDetectUDL(UserDefinedLogic):
           self.transform = transforms.Compose([transforms.ToTensor()])
           self.model = None
           self.categories = None
-          self.weights= './python_udl/yolov5/yolov5s.pt'
-          self.data = './python_udl/yolov5/data/coco128.yaml'
+          self.weights= './python_udls/yolov5/yolov5s.pt'
+          self.data = './python_udls/yolov5/data/coco128.yaml'
           self.my_id = self.capi.get_my_id()
           if (self.my_id != 0):
                self.load_model()
@@ -138,8 +138,8 @@ class HoleDetectUDL(UserDefinedLogic):
           self.transform = transforms.Compose([transforms.ToTensor()])
           self.model = None
           self.categories = None
-          self.weights= './python_udl/yolov5/yolov5s.pt'
-          self.data = './python_udl/yolov5/data/coco128.yaml'
+          self.weights= './python_udls/yolov5/yolov5s.pt'
+          self.data = './python_udls/yolov5/data/coco128.yaml'
           self.my_id = self.capi.get_my_id()
           if (self.my_id != 0):
                self.load_model()
