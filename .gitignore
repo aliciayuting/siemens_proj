@@ -1,4 +1,4 @@
 *__pycache__/
 /*.png
 cfg/*.png
-cfg/python_udls/yolov5
+cfg/python_udls/yolov5/*
