@@ -60,14 +60,17 @@ class CrackDetectUDL(UserDefinedLogic):
           '''
           super(CrackDetectUDL,self).__init__(conf_str)
           self.capi = ServiceClientAPI()
-          device_name = 'cuda:0'
+          self.my_id = self.capi.get_my_id()
+          if self.my_id < 3:
+               device_name = 'cuda:0'
+          else:
+               device_name = 'cuda:1'
           self.device = torch.device(device_name)
           self.transform = transforms.Compose([transforms.ToTensor()])
           self.model = None
           self.categories = None
           self.weights= './python_udls/yolov5/yolov5s.pt'
           self.data = './python_udls/yolov5/data/coco128.yaml'
-          self.my_id = self.capi.get_my_id()
           if (self.my_id != 0):
                self.load_model()
           self.tl = TimestampLogger()
@@ -103,6 +106,7 @@ class CrackDetectUDL(UserDefinedLogic):
           stacked_pred = np.stack([t.cpu().numpy() for t in pred])
           new_key = key + "_crack"
           cascade_context.emit(new_key, stacked_pred)
+          self.tl.log(SEND_CRACK_RESULT_TO_NEXT_TIMESTAMP,self.my_id,obj_id,extra_log_id)
           
           
 
@@ -132,15 +136,18 @@ class HoleDetectUDL(UserDefinedLogic):
           Constructor
           '''
           super(HoleDetectUDL,self).__init__(conf_str)
-          device_name = 'cuda:0'
           self.capi = ServiceClientAPI()
+          self.my_id = self.capi.get_my_id()
+          if self.my_id < 3:
+               device_name = 'cuda:0'
+          else:
+               device_name = 'cuda:1'
           self.device = torch.device(device_name)
           self.transform = transforms.Compose([transforms.ToTensor()])
           self.model = None
           self.categories = None
           self.weights= './python_udls/yolov5/yolov5s.pt'
           self.data = './python_udls/yolov5/data/coco128.yaml'
-          self.my_id = self.capi.get_my_id()
           if (self.my_id != 0):
                self.load_model()
           self.tl = TimestampLogger()
@@ -168,6 +175,7 @@ class HoleDetectUDL(UserDefinedLogic):
           stacked_pred = np.stack([t.cpu().numpy() for t in pred])
           new_key = key + "_hole"
           cascade_context.emit(new_key, stacked_pred)
+          self.tl.log(SENT_HOLE_RESULT_TO_NEXT_TIMESTAMP,self.my_id,obj_id,extra_log_id)
           
 
      def __del__(self):
@@ -244,17 +252,19 @@ class AggregateUDL(UserDefinedLogic):
                self.results[obj_id][task_name] = {}
           img_info = (round_id,camera_id)
           self.results[obj_id][task_name][img_info] = blob
-          self.tl.log(FINISH_AGGR_TIMESTAMP,self.my_id,obj_id,extra_log_id)
           if self.check_collect_all(obj_id):
                print(f"------- COLLECTED_ALL: object_id:{obj_id} -----")
                has_defect = self.process_aggr_results(obj_id)
                # Store a simple array [True/False] to represent if the product has defect. 
                # Could be encoded to a more informative object to store to this object key
                cascade_context.emit(str(obj_id), np.array(has_defect))
+               self.tl.log(FINISH_AGGR_TIMESTAMP,self.my_id,obj_id,extra_log_id)
                # Flush the logging file
                if(int(obj_id) % LOGGING_POINT == 0 and FLUSH_RESULT):
-                    self.tl.flush("hole_timestamps.dat",False)
-                    print("flushed hole_timestamp.dat")
+                    self.tl.flush("server"+str(self.my_id)+"_timestamps.dat",False)
+                    print("flushed server"+str(self.my_id)+"_timestamp.dat")
+          else:
+               self.tl.log(FINISH_AGGR_TIMESTAMP,self.my_id,obj_id,extra_log_id)
           
 
      def __del__(self):

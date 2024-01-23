@@ -37,11 +37,10 @@ def process_log_data_to_dataframe(log_data, drop_warmup=False, drop_model_info=F
      df['node_id'] = df['node_id'].astype(int)
      df['object_id'] = df['object_id'].astype(int)
      df['extra'] = df['extra'].astype(int)
+     df['roundID'] = df['extra'] // 1000
+     df['cameraID'] = df['extra'] % 1000
      if drop_warmup:
           df_filtered = df[df['object_id'] >= 19]
-          df = df_filtered
-     if drop_model_info:
-          df_filtered = df[(df['tag'] == 9000) | (df['tag'] == 10000)]
           df = df_filtered
      df['timestamp'] = df['timestamp'].astype(int)
      df['timestamp'] = df['timestamp'] / 1000000 # convert to milliseconds
