@@ -224,11 +224,11 @@ class AggregateUDL(UserDefinedLogic):
           '''
           for crack_result in self.results[obj_id]["crack"].values():
                if len(crack_result) > 0:
-                    print("crack_result has identified target object")
+                    print(f"Object{obj_id} crack_result has identified target object")
                     return True 
           for hole_result in self.results[obj_id]["hole"].values():
                if len(hole_result) > 0:
-                    print("hole_result has identified target object")
+                    print(f"Object{obj_id} hole_result has identified target object")
                     return True  
           print(f"Object {obj_id} has no defect")
           return False
