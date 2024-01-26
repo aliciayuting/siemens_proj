@@ -11,12 +11,12 @@
                 "user_defined_logic_config_list": [
                     {
                         "python_path":["python_udls"],
-                        "module":"siemens_udls",
+                        "module":"siemens_batch_udls",
                         "entry_class":"CrackDetectUDL"
                     },
                     {
                         "python_path":["python_udls"],
-                        "module":"siemens_udls",
+                        "module":"siemens_batch_udls",
                         "entry_class":"HoleDetectUDL"
                     }],
                 "destinations": [{"/partial_result":"put"},
@@ -30,9 +30,10 @@
                 "user_defined_logic_config_list": [
                     {
                         "python_path":["python_udls"],
-                        "module":"siemens_udls",
+                        "module":"siemens_batch_udls",
                         "entry_class":"AggregateUDL",
-                        "img_count_per_obj":24
+                        "camera_per_obj":8,
+                        "round_per_obj":3
                     }],
                 "destinations": [{"/aggregate_result":"put"}]
             }

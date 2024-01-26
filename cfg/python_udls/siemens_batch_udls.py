@@ -11,10 +11,12 @@ import sys
 from pathlib import Path
 import os, io, time
 from PIL import Image
+import pickle
 import torch
 from torchvision import transforms
 import math
 from logging_flags import *
+
 
 
 FILE = Path(__file__).resolve()
@@ -38,6 +40,7 @@ from utils.torch_utils import select_device, smart_inference_mode
 
 
 
+"""       ------------     METHOD1. of batching      ------------      """
 
 
 class CrackDetectUDL(UserDefinedLogic):
@@ -52,7 +55,7 @@ class CrackDetectUDL(UserDefinedLogic):
           self.model = DetectMultiBackend(self.weights, 
                                           device=self.device, 
                                           dnn=True, data=self.data, fp16=True)
-          print(f"CrackDetectUDL Constructed and YOLO model loaded to GPU")
+          print(f"batch CrackDetectUDL Constructed and YOLO model loaded to GPU")
 
      def __init__(self,conf_str):
           '''
@@ -75,8 +78,6 @@ class CrackDetectUDL(UserDefinedLogic):
                self.load_model()
           self.tl = TimestampLogger()
           self.last_img_collected_num = 0
-          
-
 
      def ocdpo_handler(self,**kwargs):
           '''
@@ -87,35 +88,33 @@ class CrackDetectUDL(UserDefinedLogic):
           blob = kwargs["blob"]
           res_key = key.split('-')[1]
           round_id = (res_key.split('_')[0])[1:] 
-          camera_id = (res_key.split('_')[1])[1:]
-          extra_log_id = int(round_id)*1000 + int(camera_id)
+          # camera_id = (res_key.split('_')[1])[1:]
+          extra_log_id = int(round_id)*1000 #+ int(camera_id)
           self.tl.log(BEGIN_CRACK_PRE_TIMESTAMP,self.my_id,obj_id,extra_log_id)
-          image = Image.open(io.BytesIO(blob))
           # image pre-proccessing 
-          input_image = self.transform(image).unsqueeze(0)
-          # TODO: add log point to collect the time it takes to transfer the image to device
-          input_image = input_image.to(self.device)
-          input_image /= 255
+          image_array = pickle.loads(blob)
+          images = [self.transform(image) for image in image_array]
+          input_batch = torch.stack(images)
+          input_batch = input_batch.to(self.device)
           # run inference
           self.tl.log(BEGIN_CRACK_DETECT_TIMESTAMP,self.my_id,obj_id,extra_log_id)
-          pred, train_out  = self.model(input_image, augment=False, visualize=False)
+          pred, train_out  = self.model(input_batch, augment=False, visualize=False)
           # post-processing: TODO: draw bounding box?
           pred = non_max_suppression(pred, conf_thres=0.25, iou_thres=0.25, classes=False, agnostic=False, max_det=1000)
           self.tl.log(FINISH_CRACK_DETECT_TIMESTAMP,self.my_id,obj_id,extra_log_id)
-          # print(f"CrackDetectUDL ocdpo_handler: message_id={key}, result={len(pred)}")
           # save result
-          stacked_pred = np.stack([t.cpu().numpy() for t in pred])
-          new_key = key + "_crack"
-          cascade_context.emit(new_key, stacked_pred)
+          # serialize preds
+          serialized_tensors = [pickle.dumps(tensor.cpu()) for tensor in pred]
+          concatenated_bytes = b''.join(len(t).to_bytes(4, 'big') + t for t in serialized_tensors)
+          new_key = "/partial_result/" + key + "_crack"
+          self.capi.put(new_key, concatenated_bytes)
           self.tl.log(SEND_CRACK_RESULT_TO_NEXT_TIMESTAMP,self.my_id,obj_id,extra_log_id)
-
 
      def __del__(self):
           '''
           Destructor
           '''
           print(f"CrackDetectUDL destructor")
-
 
 
 class HoleDetectUDL(UserDefinedLogic):
@@ -162,22 +161,24 @@ class HoleDetectUDL(UserDefinedLogic):
           blob = kwargs["blob"]
           res_key = key.split('-')[1]
           round_id = (res_key.split('_')[0])[1:] 
-          camera_id = (res_key.split('_')[1])[1:]
-          extra_log_id = int(round_id)*1000 + int(camera_id)
+          # camera_id = (res_key.split('_')[1])[1:]
+          extra_log_id = int(round_id)*1000 # + int(camera_id)
           self.tl.log(BEGIN_HOLE_PRE_TIMESTAMP,self.my_id,obj_id,extra_log_id)
-          image = Image.open(io.BytesIO(blob))
-          input_image = self.transform(image).unsqueeze(0)
-          input_image = input_image.to(self.device)
-          input_image /= 255
+          image_array = pickle.loads(blob)
+          images = [self.transform(image) for image in image_array]
+          input_batch = torch.stack(images)
+          input_batch = input_batch.to(self.device)
+          # run inference
           self.tl.log(BEGIN_HOLE_DETECT_TIMESTAMP,self.my_id,obj_id,extra_log_id)
-          pred, train_out  = self.model(input_image, augment=False, visualize=False)
+          pred, train_out  = self.model(input_batch, augment=False, visualize=False)
           pred = non_max_suppression(pred, conf_thres=0.25, iou_thres=0.25, classes=False, agnostic=False, max_det=1000)
           self.tl.log(FINISH_HOLE_DETECT_TIMESTAMP,self.my_id,obj_id,extra_log_id)
-          stacked_pred = np.stack([t.cpu().numpy() for t in pred])
-          new_key = key + "_hole"
-          cascade_context.emit(new_key, stacked_pred)
+          emit_pred = np.array([t.cpu().numpy() for t in pred], dtype=object)
+          serialized_tensors = [pickle.dumps(tensor.cpu()) for tensor in pred]
+          concatenated_bytes = b''.join(len(t).to_bytes(4, 'big') + t for t in serialized_tensors)
+          new_key = "/partial_result/" + key + "_hole"
+          self.capi.put(new_key, concatenated_bytes)
           self.tl.log(SENT_HOLE_RESULT_TO_NEXT_TIMESTAMP,self.my_id,obj_id,extra_log_id)
-
 
      def __del__(self):
           '''
@@ -198,19 +199,20 @@ class AggregateUDL(UserDefinedLogic):
           '''
           super(AggregateUDL,self).__init__(conf_str)
           self.conf = json.loads(conf_str)
-          self.img_count_per_obj = int(self.conf["img_count_per_obj"])
+          self.camera_per_obj = int(self.conf["camera_per_obj"])
+          self.round_per_obj = int(self.conf["round_per_obj"])
           self.results = {} # map: {obj_id->{"hole": {(round_id, camera_id):result, ...}, "crack": [img1_hole_result, img2_hole_result, ...]}, ... }
           self.tl = TimestampLogger()
           self.capi = ServiceClientAPI()
           self.my_id = self.capi.get_my_id()
-          print(f"AggregateUDL Constructed, img_count_per_obj set to {self.img_count_per_obj}")
+          print(f"AggregateUDL Constructed, camera_per_obj set to {self.camera_per_obj},round_per_obj set to {self.round_per_obj} ")
 
      def check_collect_all(self, obj_id):
           if obj_id not in self.results:
                return False
-          if "crack" not in self.results[obj_id] or len(self.results[obj_id]["crack"]) < self.img_count_per_obj:
+          if "crack" not in self.results[obj_id] or len(self.results[obj_id]["crack"]) < self.round_per_obj * self.camera_per_obj:
                return False
-          if "hole" not in self.results[obj_id] or len(self.results[obj_id]["hole"]) < self.img_count_per_obj:
+          if "hole" not in self.results[obj_id] or len(self.results[obj_id]["hole"]) < self.round_per_obj * self.camera_per_obj:
                return False
           return True
 
@@ -222,17 +224,27 @@ class AggregateUDL(UserDefinedLogic):
           '''
           for crack_result in self.results[obj_id]["crack"].values():
                if len(crack_result) > 0:
-                    print("crack_result has len > 0")
-                    print(crack_result)
+                    print("crack_result has identified target object")
                     return True 
           for hole_result in self.results[obj_id]["hole"].values():
                if len(hole_result) > 0:
-                    print("hole_result has len > 0")
-                    print(hole_result)
+                    print("hole_result has identified target object")
                     return True  
           print(f"Object {obj_id} has no defect")
           return False
 
+     def deserialize_blob(self, concatenated_bytes):
+          deserialized_tensors = []
+          i = 0
+          while i < len(concatenated_bytes):
+               # Read the length
+               length = int.from_bytes(concatenated_bytes[i:i+4], 'big')
+               i += 4
+               tensor_bytes = concatenated_bytes[i:i+length]
+               i += length
+               tensor = pickle.loads(tensor_bytes)
+               deserialized_tensors.append(tensor)
+          return deserialized_tensors
 
      def ocdpo_handler(self,**kwargs):
           '''
@@ -243,16 +255,20 @@ class AggregateUDL(UserDefinedLogic):
           obj_id = int(key.split('-')[0])
           res_key = key.split('-')[1]
           round_id = (res_key.split('_')[0])[1:] 
-          camera_id = (res_key.split('_')[1])[1:]
-          extra_log_id = int(round_id)*1000 + int(camera_id)
+          # camera_id = (res_key.split('_')[1])[1:]
+          extra_log_id = int(round_id)*1000 # + int(camera_id)
           self.tl.log(BEGIN_AGGR_TIMESTAMP,self.my_id,obj_id,extra_log_id)
-          task_name = res_key.split('_')[2]
+          task_name = res_key.split('_')[-1]
           if obj_id not in self.results:
                self.results[obj_id] = {}
           if task_name not in self.results[obj_id]:
-               self.results[obj_id][task_name] = {}
-          img_info = (round_id,camera_id)
-          self.results[obj_id][task_name][img_info] = blob
+               self.results[obj_id][task_name] = {} 
+          # self.results[obj_id][task_name][img_info] = blob
+          deserialized_results = self.deserialize_blob(blob)
+          for i in range(len(deserialized_results)):
+               camera_id = i   # assume the images batch is according to the camera order. TODO: edit this
+               img_info = (round_id,camera_id)
+               self.results[obj_id][task_name][img_info] = deserialized_results[i]
           if self.check_collect_all(obj_id):
                print(f"------- COLLECTED_ALL: object_id:{obj_id} -----")
                has_defect = self.process_aggr_results(obj_id)
@@ -266,7 +282,6 @@ class AggregateUDL(UserDefinedLogic):
                     print("flushed server"+str(self.my_id)+"_timestamp.dat")
           else:
                self.tl.log(FINISH_AGGR_TIMESTAMP,self.my_id,obj_id,extra_log_id)
-
 
      def __del__(self):
           '''
