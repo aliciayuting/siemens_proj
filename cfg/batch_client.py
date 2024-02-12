@@ -14,7 +14,7 @@ import pickle
 
 IMAGE_DIRECTORY = './siemensimgs'
 
-TOTAL_NUM_OBJ = 1
+TOTAL_NUM_OBJ = 500
 TOTAL_CAMERA = 8
 TOTAL_ROUND = 3
 
@@ -23,6 +23,15 @@ OBJECT_POOLS_LIST = [
 ['/partial_result', "VolatileCascadeStoreWithStringKey",0, "/[0-9]+-"],
 ['/aggregate_result', "VolatileCascadeStoreWithStringKey", 0, None]
 ]
+
+SEPERATE_UDL = True
+if SEPERATE_UDL:
+     OBJECT_POOLS_LIST = [
+     ['/imgCrake', "VolatileCascadeStoreWithStringKey",0, None],
+     ['/imgHole', "VolatileCascadeStoreWithStringKey",0, None],
+     ['/partial_result', "VolatileCascadeStoreWithStringKey",0, "/[0-9]+-"],
+     ['/aggregate_result', "VolatileCascadeStoreWithStringKey", 0, None]
+     ]
 
 def get_image_pathnames(directory, img_suffixes=['.jpg','.png', '.jpeg']):
      '''
@@ -90,6 +99,8 @@ if __name__ == '__main__':
                     tl.log(CAMERA_SEND_TIME,capi.get_my_id(),obj_id,extra_log_id)
                while(int(time.perf_counter() * 1000) - last_round_time < 200):
                     time.sleep(0.0001)
+               if SEPERATE_UDL:
+                    last_round_time = time.perf_counter() * 1000
                # get batched images from camera
                input_images = []
                for camera_id in camera_ids:
@@ -100,11 +111,26 @@ if __name__ == '__main__':
                images_bytes = pickle.dumps(input_images)
                key = str(obj_id) + "-r" + str(round_id)
                extra_log_id = round_id * 1000
-               print("put img name is: ", key)
                tl.log(EXTERNAL_CLIENT_SEND_TIME,capi.get_my_id(),obj_id,extra_log_id)
-               capi.put(f"/img_input/{key}",images_bytes,trigger=False,message_id=image_id)
+               if SEPERATE_UDL:
+                    tl.log(EXTERNAL_CLIENT_BEGIN_SEND_CRACK_TIME,capi.get_my_id(),obj_id,extra_log_id)
+                    res = capi.put(f"/imgCrake/{key}",images_bytes,trigger=False,message_id=image_id)
+                    tl.log(EXTERNAL_CLIENT_FINISH_SEND_CRACK_TIME,capi.get_my_id(),obj_id,extra_log_id)
+                    if res:
+                         res.get_result()
+                    
+
+                    tl.log(EXTERNAL_CLIENT_BEGIN_SEND_HOLE_TIME,capi.get_my_id(),obj_id,extra_log_id)
+                    res = capi.put(f"/imgHole/{key}",images_bytes,trigger=False,message_id=image_id)
+                    tl.log(EXTERNAL_CLIENT_FINISH_SEND_HOLE_TIME,capi.get_my_id(),obj_id,extra_log_id)
+
+                    if res:
+                         res.get_result()
+               else:
+                    capi.put(f"/img_input/{key}",images_bytes,trigger=False,message_id=image_id)
                tl.log(EXTERNAL_CLIENT_FINISH_SEND_TIME,capi.get_my_id(),obj_id,extra_log_id)
-               last_round_time = time.perf_counter() * 1000
+               if not SEPERATE_UDL:
+                    last_round_time = time.perf_counter() * 1000
           while(int(time.perf_counter() * 1000) - last_obj_time < 2600):
                time.sleep(0.0001)
           last_obj_time = time.perf_counter() * 1000
